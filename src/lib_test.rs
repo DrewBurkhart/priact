@@ -13,8 +13,9 @@ define_actor! {
         }
 
         @priority(Low)
-        fn Increment(&mut self) {
+        fn Increment(&mut self, ack: oneshot::Sender<()>) {
             self.count += 1;
+            let _ = ack.send(());
         }
 
         @priority(Medium)
@@ -32,7 +33,9 @@ async fn test_actor_explicit_shutdown() {
 
     println!("\n--- Test: Explicit Shutdown ---");
     for _ in 0..5 {
-        tx.send(TestCounterMsg::Increment()).await.unwrap();
+        // Create a new channel for each acknowledgment
+        let (ack_tx, _) = oneshot::channel();
+        tx.send(TestCounterMsg::Increment(ack_tx)).await.unwrap();
     }
 
     // Send a shutdown message
@@ -40,7 +43,8 @@ async fn test_actor_explicit_shutdown() {
     tx.send(TestCounterMsg::Shutdown).await.unwrap();
 
     // Try to send more messages (these might not be processed if Shutdown is immediate)
-    let send_res = tx.send(TestCounterMsg::Increment()).await;
+    let (ack_tx, _) = oneshot::channel();
+    let send_res = tx.send(TestCounterMsg::Increment(ack_tx)).await;
     if send_res.is_err() {
         println!(
             "Attempted to send message after shutdown, got error: {:?}",
@@ -56,30 +60,70 @@ async fn test_actor_explicit_shutdown() {
 
 #[tokio::test]
 async fn test_actor_priority() {
+    // --- Setup ---
     let counter_actor_state = TestCounter { count: 0 };
     let tx = spawn_actor(counter_actor_state);
+    println!("\n--- Test: Actor with Priority and Synchronization ---");
 
-    println!("\n--- Test: Priority ---");
-    // Send a low priority message
+    // --- Phase 1: Send 10 low-priority messages and wait for them to be processed ---
+    println!("Sending 10 Increment messages...");
+    for i in 0..10 {
+        // Create a new channel for each acknowledgment
+        let (ack_tx, ack_rx) = oneshot::channel();
 
-    for _ in 0..10 {
-        tx.send(TestCounterMsg::Increment()).await.unwrap();
+        // Send the message with the ack sender
+        tx.send(TestCounterMsg::Increment(ack_tx)).await.unwrap();
+
+        // **CRUCIAL**: Wait for the actor to signal that it has processed the message
+        ack_rx.await.unwrap();
+        println!("  - Increment #{} acknowledged.", i + 1);
     }
-    // Send a high priority message that immediately asks for value
+    println!("All 10 Increment messages have been processed by the actor.");
+
+    // At this point, we are GUARANTEED that the actor's count is 10.
+
+    // --- Phase 2: Send a high-priority message and check the state ---
+    println!("Sending high-priority GetValue message...");
     let (resp_tx, resp_rx) = oneshot::channel();
     tx.send(TestCounterMsg::GetValue(resp_tx)).await.unwrap();
-    // Send a few more low priority messages that will be processed after GetValue
-    tx.send(TestCounterMsg::Increment()).await.unwrap();
-    tx.send(TestCounterMsg::Increment()).await.unwrap();
 
+    // --- Phase 3: Send more low-priority messages concurrently ---
+    // These should be processed *after* GetValue because of its high priority.
+    println!("Sending 2 more low-priority Increment messages...");
+    let (ack_tx_11, ack_rx_11) = oneshot::channel();
+    let (ack_tx_12, ack_rx_12) = oneshot::channel();
+    tx.send(TestCounterMsg::Increment(ack_tx_11)).await.unwrap();
+    tx.send(TestCounterMsg::Increment(ack_tx_12)).await.unwrap();
+
+    // --- Assertions ---
+    // Await the response from GetValue. It should be processed before the last two Increments.
     let count = resp_rx.await.unwrap();
-    // GetValue (High) should be processed before subsequent Increments (Low)
-    // So the count should be 1 (from the first Increment)
-    println!("Count with priority: {}", count);
-    assert_eq!(count, 10);
+    println!("Value received from GetValue: {}", count);
+    assert_eq!(
+        count, 10,
+        "GetValue should see the count after the first 10 increments"
+    );
 
-    // Drop the sender to clean up
+    // --- Optional: Clean up and verify final state ---
+    // Wait for the final two increments to finish
+    ack_rx_11.await.unwrap();
+    ack_rx_12.await.unwrap();
+
+    // Check the final state of the actor
+    let (final_resp_tx, final_resp_rx) = oneshot::channel();
+    tx.send(TestCounterMsg::GetValue(final_resp_tx))
+        .await
+        .unwrap();
+    let final_count = final_resp_rx.await.unwrap();
+    println!("Final actor count: {}", final_count);
+    assert_eq!(
+        final_count, 12,
+        "The final count should reflect all 12 increments"
+    );
+
+    // Drop the sender to allow the actor tasks to gracefully shut down
     drop(tx);
+    // Give a moment for shutdown messages to print
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 }
 
@@ -90,7 +134,9 @@ async fn test_actor_implicit_shutdown_completes() {
 
     println!("\n--- Test: Implicit Shutdown Completes ---");
     for _ in 0..5 {
-        tx.send(TestCounterMsg::Increment()).await.unwrap();
+        // Create a new channel for each acknowledgment
+        let (ack_tx, _) = oneshot::channel();
+        tx.send(TestCounterMsg::Increment(ack_tx)).await.unwrap();
     }
 
     let (resp_tx, resp_rx) = oneshot::channel();
