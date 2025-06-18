@@ -4,6 +4,9 @@ use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
 
+#[cfg(test)]
+mod lib_test;
+
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 pub enum Priority {
     Low,
