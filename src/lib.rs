@@ -1,3 +1,11 @@
+//! # priact
+//!
+//! [![crates.io](https://img.shields.io/crates/v/priact)](https://crates.io/crates/priact)
+//!
+//! A lightweight, priority-driven actor framework for Rust.
+//!
+#![doc = include_str!("../README.md")]
+
 use async_trait::async_trait;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
