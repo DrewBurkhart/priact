@@ -12,10 +12,11 @@ categories = ["concurrency", "network-programming", "utility-libraries"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actor-macro = { path = "./actor-macro" }
+async-trait = "0.1"           # if not already
 tokio = { version = "1", features = [
     "rt-multi-thread",
     "macros",
     "sync",
     "time",
 ] }
-async-trait = "0.1"

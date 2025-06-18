@@ -4,6 +4,8 @@ use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
 
+pub use actor_macro::define_actor;
+
 #[cfg(test)]
 mod lib_test;
 
@@ -140,73 +142,73 @@ impl<T: Prioritized> Ord for PrioritizedWrapper<T> {
     }
 }
 
-#[macro_export]
-macro_rules! define_actor {
-    (
-        $actor_name:ident {
-            $($field_name:ident : $field_ty:ty),* $(,)?
-        }
+// #[macro_export]
+// macro_rules! define_actor {
+//     (
+//         $actor_name:ident {
+//             $($field_name:ident : $field_ty:ty),* $(,)?
+//         }
 
-        impl $msg_name:ident {
-            $(
-                @priority($prio:ident)
-                fn $method:ident ( &mut self $(, $arg_name:ident : $arg_ty:ty )* ) $(-> $ret_ty:ty)? $body:block
-            )*
-        }
-    ) => {
-        pub struct $actor_name {
-            $(pub $field_name : $field_ty),*
-        }
+//         impl $msg_name:ident {
+//             $(
+//                 @priority($prio:ident)
+//                 fn $method:ident ( &mut self $(, $arg_name:ident : $arg_ty:ty )* ) $(-> $ret_ty:ty)? $body:block
+//             )*
+//         }
+//     ) => {
+//         pub struct $actor_name {
+//             $(pub $field_name : $field_ty),*
+//         }
 
-        impl Drop for $actor_name {
-            fn drop(&mut self) {
-                println!("[{}] Actor instance being dropped.", stringify!($actor_name));
-            }
-        }
+//         impl Drop for $actor_name {
+//             fn drop(&mut self) {
+//                 println!("[{}] Actor instance being dropped.", stringify!($actor_name));
+//             }
+//         }
 
-        pub enum $msg_name {
-            $(
-                $method($($arg_ty),*)
-            ),*,
-            Shutdown, // Explicit Shutdown message
-        }
+//         pub enum $msg_name {
+//             $(
+//                 $method($($arg_ty),*)
+//             ),*,
+//             Shutdown, // Explicit Shutdown message
+//         }
 
-        impl $crate::Prioritized for $msg_name {
-            fn priority(&self) -> $crate::Priority {
-                match self {
-                    $(
-                        $msg_name::$method(..) => $crate::Priority::$prio,
-                    )*
-                    $msg_name::Shutdown => $crate::Priority::Shutdown, // Assign highest priority
-                }
-            }
-        }
+//         impl $crate::Prioritized for $msg_name {
+//             fn priority(&self) -> $crate::Priority {
+//                 match self {
+//                     $(
+//                         $msg_name::$method(..) => $crate::Priority::$prio,
+//                     )*
+//                     $msg_name::Shutdown => $crate::Priority::Shutdown, // Assign highest priority
+//                 }
+//             }
+//         }
 
-        #[async_trait::async_trait]
-        impl $crate::Actor for $actor_name {
-            type Msg = $msg_name;
+//         #[async_trait::async_trait]
+//         impl $crate::Actor for $actor_name {
+//             type Msg = $msg_name;
 
-            async fn handle(&mut self, msg: Self::Msg) -> bool {
-                match msg {
-                    $(
-                        $msg_name::$method($($arg_name),*) => {
-                            self.$method($($arg_name),*).await;
-                            true // Continue processing after method call
-                        }
-                    ),*
-                    $msg_name::Shutdown => {
-                        println!("[{}] Processing Shutdown message.", stringify!($actor_name));
-                        false // Signal to stop processing
-                    }
-                }
-            }
-        }
+//             async fn handle(&mut self, msg: Self::Msg) -> bool {
+//                 match msg {
+//                     $(
+//                         $msg_name::$method($($arg_name),*) => {
+//                             self.$method($($arg_name),*).await;
+//                             true // Continue processing after method call
+//                         }
+//                     ),*
+//                     $msg_name::Shutdown => {
+//                         println!("[{}] Processing Shutdown message.", stringify!($actor_name));
+//                         false // Signal to stop processing
+//                     }
+//                 }
+//             }
+//         }
 
-        #[allow(non_snake_case)]
-        impl $actor_name {
-            $(
-                pub async fn $method(&mut self $(, $arg_name : $arg_ty )* ) $(-> $ret_ty)? $body
-            )*
-        }
-    };
-}
+//         #[allow(non_snake_case)]
+//         impl $actor_name {
+//             $(
+//                 pub async fn $method(&mut self $(, $arg_name : $arg_ty )* ) $(-> $ret_ty)? $body
+//             )*
+//         }
+//     };
+// }

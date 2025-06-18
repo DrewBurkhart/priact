@@ -1,4 +1,4 @@
-use crate::{define_actor, spawn_actor};
+use crate::{define_actor, spawn_actor, Actor, Prioritized, Priority};
 use tokio::sync::oneshot;
 
 define_actor! {
@@ -18,7 +18,7 @@ define_actor! {
         }
 
         @priority(Medium)
-        fn DecrementAsync(&mut self) {
+        async fn DecrementAsync(&mut self) {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             self.count -= 1;
         }
