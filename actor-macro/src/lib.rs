@@ -1,5 +1,3 @@
-#[allow(dead_code)]
-// actor-macro/src/lib.rs
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream, Result};
@@ -10,6 +8,7 @@ use syn::{
 // Represents one field: `name: Type`
 struct FieldDef {
     name: Ident,
+    #[allow(dead_code)]
     colon_token: Token![:],
     ty: Type,
 }
@@ -154,11 +153,23 @@ pub fn define_actor(input: TokenStream) -> TokenStream {
         }
     });
 
-    // Method implementations: signature carries async
+    // Method implementations: split async vs sync to preserve asyncness
     let method_defs = methods.iter().map(|m| {
         let sig = &m.sig;
+        let name = &sig.ident;
+        let generics = &sig.generics;
+        let inputs = &sig.inputs;
+        let output = &sig.output;
         let body = &m.body;
-        quote! { pub #sig #body }
+        if sig.asyncness.is_some() {
+            quote! {
+                pub async fn #name #generics(#inputs) #output #body
+            }
+        } else {
+            quote! {
+                pub fn #name #generics(#inputs) #output #body
+            }
+        }
     });
 
     let expanded = quote! {
