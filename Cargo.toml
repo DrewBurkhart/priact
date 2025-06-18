@@ -1,6 +1,6 @@
 [package]
 name = "priact"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Andrew Burkhart <andrew.burkhart@outlook.com>"]
 description = "A lightweight and ergonomic Actor implementation for Rust, built on tokio, featuring explicit message prioritization via a BinaryHeap."
