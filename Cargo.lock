@@ -103,6 +103,8 @@ dependencies = [
 [[package]]
 name = "priact-actor-macro"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d3d3c4c760d8760323eb4d7f5b474a800fffde9980df8f6231f279148a2066e"
 dependencies = [
  "async-trait",
  "proc-macro2",
