@@ -9,7 +9,7 @@ license     = "MIT"
 documentation = "https://docs.rs/priact"
 repository = "https://github.com/drewburkhart/priact"
 keywords = ["actor", "tokio", "concurrency", "async", "priority"]
-categories = ["concurrency", "network-programming", "utility-libraries"]
+categories = ["concurrency", "network-programming"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
