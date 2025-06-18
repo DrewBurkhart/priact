@@ -12,6 +12,11 @@ pub enum Priority {
     // Add highest priority for shutdown messages
     Shutdown,
 }
+
+impl Prioritized for Priority {
+    fn priority(&self) -> Priority {
+        *self
+    }
 }
 
 pub trait Prioritized {
