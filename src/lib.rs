@@ -123,6 +123,6 @@ impl<T: Prioritized> PartialOrd for PrioritizedWrapper<T> {
 
 impl<T: Prioritized> Ord for PrioritizedWrapper<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.0.priority().cmp(&self.0.priority())
+        self.0.priority().cmp(&other.0.priority())
     }
 }
