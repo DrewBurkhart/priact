@@ -46,8 +46,9 @@
           priact
         ];
         packages = with pkgs; [
-          rust-analyzer # for LSP
+          rustup        # for rust toolchain
           cargo-watch   # for auto-recompilation
+          nixd          # for nix lsp
         ];
         RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
