@@ -1,9 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream, Result};
-use syn::{
-    braced, parenthesized, punctuated::Punctuated, token, Block, Ident, Signature, Token, Type,
-};
+use syn::{braced, parenthesized, punctuated::Punctuated, token, Ident, ItemFn, Token, Type};
 
 // Represents one field: `name: Type`
 struct FieldDef {
@@ -29,29 +27,28 @@ struct MethodDef {
     _prio_kw: Ident,
     _paren: token::Paren,
     priority: Ident,
-    sig: Signature,
-    body: Block,
+    func: ItemFn,
 }
 
 impl Parse for MethodDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Parse `@priority(P)`
         let _at: Token![@] = input.parse()?;
         let _prio_kw: Ident = input.parse()?;
+        if _prio_kw != "priority" {
+            return Err(syn::Error::new(_prio_kw.span(), "expected `priority`"));
+        }
         let content;
         let _paren = parenthesized!(content in input);
         let priority: Ident = content.parse()?;
 
-        // Parse function signature (async handled by Signature)
-        let sig: Signature = input.parse()?;
-        let body: Block = input.parse()?;
+        let func: ItemFn = input.parse()?;
+
         Ok(MethodDef {
             _at,
             _prio_kw,
             _paren,
             priority,
-            sig,
-            body,
+            func,
         })
     }
 }
@@ -111,8 +108,9 @@ pub fn define_actor(input: TokenStream) -> TokenStream {
 
     // Enum variants: always tuple variants (even zero-arg)
     let variants = methods.iter().map(|m| {
-        let name = &m.sig.ident;
+        let name = &m.func.sig.ident;
         let args: Vec<_> = m
+            .func
             .sig
             .inputs
             .iter()
@@ -130,22 +128,24 @@ pub fn define_actor(input: TokenStream) -> TokenStream {
 
     // Priority match arms
     let priorities = methods.iter().map(|m| {
-        let name = &m.sig.ident;
+        let name = &m.func.sig.ident;
         let prio = &m.priority;
         quote! { #msg_name::#name(..) => Priority::#prio, }
     });
 
     // handle() match arms: always tuple patterns
     let handle_arms = methods.iter().map(|m| {
-        let name = &m.sig.ident;
-        let is_async = m.sig.asyncness.is_some();
-        let arg_idents: Vec<_> = m.sig.inputs.iter().skip(1).filter_map(|arg| {
+        let sig = &m.func.sig;
+        let name = &sig.ident;
+        let is_async = sig.asyncness.is_some();
+        let arg_idents: Vec<_> = sig.inputs.iter().skip(1).filter_map(|arg| {
             if let syn::FnArg::Typed(pat_ty) = arg {
                 if let syn::Pat::Ident(pi) = &*pat_ty.pat {
                     Some(&pi.ident)
                 } else { None }
             } else { None }
         }).collect();
+
         if is_async {
             quote! { #msg_name::#name( #(#arg_idents),* ) => { self.#name( #(#arg_idents),* ).await; true }, }
         } else {
@@ -153,22 +153,13 @@ pub fn define_actor(input: TokenStream) -> TokenStream {
         }
     });
 
-    // Method implementations: split async vs sync to preserve asyncness
+    // Method implementations: directly use the parsed signature and body
     let method_defs = methods.iter().map(|m| {
-        let sig = &m.sig;
-        let name = &sig.ident;
-        let generics = &sig.generics;
-        let inputs = &sig.inputs;
-        let output = &sig.output;
-        let body = &m.body;
-        if sig.asyncness.is_some() {
-            quote! {
-                pub async fn #name #generics(#inputs) #output #body
-            }
-        } else {
-            quote! {
-                pub fn #name #generics(#inputs) #output #body
-            }
+        let sig = &m.func.sig;
+        let body = &m.func.block;
+        quote! {
+            // Note: ItemFn's visibility is not used; we force `pub` here.
+            pub #sig #body
         }
     });
 
