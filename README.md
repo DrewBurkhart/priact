@@ -120,6 +120,8 @@ For detailed API documentation, please refer to [docs.rs](https://www.google.com
 
 ## 🤝 Contributing
 
+Thank you to [@lucretiel](https://www.github.com/lucretiel) and [@ipetkov](https://github.com/ipetkov) for help with the macro!
+
 Contributions are welcome\! Feel free to open issues or submit pull requests.
 
 ## 📄 License
