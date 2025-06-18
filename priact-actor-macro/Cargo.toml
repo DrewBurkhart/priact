@@ -1,0 +1,21 @@
+[package]
+name         = "priact-actor-macro"
+version      = "0.1.0"
+authors = ["Andrew Burkhart <andrew.burkhart@outlook.com>"]
+edition      = "2021"
+description  = "The define_actor! procedural macro for priact"
+license      = "MIT"
+readme       = "README.md"
+repository   = "https://github.com/drewburkhart/priact"
+documentation = "https://docs.rs/actor-macro"
+keywords     = ["actor", "macro", "tokio", "async"]
+categories   = ["asynchronous", "concurrency", "macro"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+async-trait = "0.1"

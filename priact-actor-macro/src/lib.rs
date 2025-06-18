@@ -1,3 +1,11 @@
+//! actor-macro: the `define_actor!` proc-macro for building priority-driven actors.
+//!
+//! ```rust
+//! use priact::{define_actor, spawn_actor, Actor};
+//! define_actor! { … }
+//! ```
+#![doc = include_str!("../README.md")]
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream, Result};
