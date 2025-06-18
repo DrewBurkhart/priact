@@ -12,7 +12,7 @@ use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
 
-pub use actor_macro::define_actor;
+pub use priact_actor_macro::define_actor;
 
 #[cfg(test)]
 mod lib_test;
