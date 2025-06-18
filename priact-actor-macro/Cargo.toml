@@ -9,7 +9,7 @@ readme       = "README.md"
 repository   = "https://github.com/drewburkhart/priact"
 documentation = "https://docs.rs/actor-macro"
 keywords     = ["actor", "macro", "tokio", "async"]
-categories   = ["asynchronous", "concurrency", "macro"]
+categories   = ["asynchronous", "concurrency"]
 
 [lib]
 proc-macro = true
