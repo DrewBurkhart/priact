@@ -1,8 +1,8 @@
+use async_trait::async_trait;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
-use async_trait::async_trait;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Priority {
@@ -139,30 +139,3 @@ macro_rules! define_actor {
         }
     };
 }
-
-/*
-define_actor! {
-    Counter {
-        count: i32
-    }
-
-    impl CounterMsg {
-        @priority(High)
-        fn GetValue(&mut self, tx: tokio::sync::oneshot::Sender<i32>) {
-            let _ = tx.send(self.count);
-        }
-
-        @priority(Low)
-        fn Increment(&mut self) {
-            self.count += 1;
-        }
-    }
-}
-
-// then
-for _ in 0..100 {
-    tx.send(CounterMsg::Increment).await.unwrap();
-}
-
-tx.send(CounterMsg::GetValue(resp_tx)).await.unwrap();
- */
