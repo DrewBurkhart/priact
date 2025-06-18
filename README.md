@@ -11,7 +11,7 @@ A lightweight and ergonomic Actor implementation for Rust, built on `tokio`, fea
   * **Ergonomic `define_actor!` Macro:** Simplifies actor definition by automatically generating message enums and `handle` logic, reducing boilerplate.
   * **Built on `tokio`:** Seamlessly integrates with the `tokio` asynchronous runtime.
 
-## 💡 Why use `priact`?
+## 💡 Why `priact`?
 
 While Rust's ownership system makes data races less common, managing mutable state across asynchronous tasks can still be challenging. The Actor Model provides a clear pattern for this, and `priact` offers:
 
@@ -36,29 +36,35 @@ async-trait = "0.1" # Required by the Actor trait
 Define your actor and its messages using the `define_actor!` macro:
 
 ```rust
-use prioritized_actor::{define_actor, spawn_actor, Priority};
+use priact::{define_actor, spawn_actor, Actor, Priority};
 use tokio::sync::oneshot;
 
 // Define your actor's state and its methods
 define_actor! {
-    Counter {
+    /// A simple counter actor.
+    TestCounter {
         count: i32,
     }
 
     // Define the messages your actor can handle
-    impl CounterMsg {
+    impl TestCounterMsg {
         // Methods prefixed with @priority will be translated into messages
         // `self` here refers to the actor's internal state
+
+        // High-priority “read” message
         @priority(High)
         fn GetValue(&mut self, tx: oneshot::Sender<i32>) {
-            let _ = tx.send(self.count); // Send the current count back
+            let _ = tx.send(self.count);
         }
 
+        // Low-priority “write” message
         @priority(Low)
-        fn Increment(&mut self) {
+        fn Increment(&mut self, ack: oneshot::Sender<()>) {
             self.count += 1;
+            let _ = ack.send(());
         }
 
+        // Medium-priority asynchronous decrement
         @priority(Medium)
         async fn DecrementAsync(&mut self) {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -69,49 +75,38 @@ define_actor! {
 
 #[tokio::main]
 async fn main() {
-    // Create an instance of your actor's state
-    let my_counter = Counter { count: 0 };
+    // Create actor state
+    let counter = TestCounter { count: 0 };
 
-    // Spawn the actor, getting a sender to communicate with it
-    let tx = spawn_actor(my_counter);
+    // Spawn it, getting back a `mpsc::Sender<TestCounterMsg>`
+    let tx = spawn_actor(counter);
 
-    // Send some messages
-    println!("Sending Increment messages...");
-    for _ in 0..100 {
-        tx.send(CounterMsg::Increment).await.unwrap();
-    }
+    // Send some messages...
+    let (ack_tx, ack_rx) = oneshot::channel();
+    tx.send(TestCounterMsg::Increment(ack_tx)).await.unwrap();
+    ack_rx.await.unwrap();
 
-    // Send a high-priority GetValue message
+    // Query the current count
     let (resp_tx, resp_rx) = oneshot::channel();
-    tx.send(CounterMsg::GetValue(resp_tx)).await.unwrap();
-    let count = resp_rx.await.unwrap();
-    println!("Counter value after 100 increments (should be 100): {}", count);
+    tx.send(TestCounterMsg::GetValue(resp_tx)).await.unwrap();
+    let value = resp_rx.await.unwrap();
+    println!("Current count = {}", value);
 
-    println!("Sending Increment and DecrementAsync messages...");
-    for i in 0..10 {
-        tx.send(CounterMsg::Increment).await.unwrap();
-        // Sending a mix of priorities
-        if i % 2 == 0 {
-            tx.send(CounterMsg::DecrementAsync).await.unwrap();
-        } else {
-            tx.send(CounterMsg::Increment).await.unwrap();
-        }
-    }
-
-    // Send more high-priority GetValue messages to see current state
-    let (resp_tx, resp_rx) = oneshot::channel();
-    tx.send(CounterMsg::GetValue(resp_tx)).await.unwrap();
-    let count = resp_rx.await.unwrap();
-    println!("Final counter value: {}", count);
-
-    // Drop the sender to signal the actor to shut down
-    drop(tx);
-    println!("Actor sender dropped. Actor will terminate after processing remaining messages.");
-
-    // Allow some time for messages to process and actor to shut down
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    // Shut down the actor
+    tx.send(TestCounterMsg::Shutdown).await.unwrap();
 }
 ```
+
+## 🔍 Under the Hood
+
+1. **mpsc Receiver Task**  
+   Listens on a Tokio mpsc channel and pushes messages into a `BinaryHeap<PrioritizedWrapper>`.
+2. **Processor Task**  
+   Pops highest-priority message, calls your typed `handle` on the actor, and repeats.
+3. **Shutdown**  
+   - **Explicit:** A `Shutdown` variant returns `false` from `handle`, tearing down both tasks.  
+   - **Implicit:** Dropping all `Sender` handles drains the queue then stops.
+
 
 ## 📚 API Reference
 
