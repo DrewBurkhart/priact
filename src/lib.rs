@@ -199,6 +199,7 @@ macro_rules! define_actor {
             }
         }
 
+        #[allow(non_snake_case)]
         impl $actor_name {
             $(
                 pub async fn $method(&mut self $(, $arg_name : $arg_ty )* ) $(-> $ret_ty)? $body
