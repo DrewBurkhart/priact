@@ -9,6 +9,9 @@ pub enum Priority {
     Low,
     Medium,
     High,
+    // Add highest priority for shutdown messages
+    Shutdown,
+}
 }
 
 pub trait Prioritized {
@@ -21,12 +24,12 @@ pub trait Prioritized {
 pub trait Actor: Send + 'static {
     type Msg: Send + 'static + Prioritized;
 
-    async fn handle(&mut self, msg: Self::Msg);
+    async fn handle(&mut self, msg: Self::Msg) -> bool;
 }
 
 pub fn spawn_actor<A>(mut actor: A) -> mpsc::Sender<A::Msg>
 where
-    A: Actor,
+    A: Actor + Send + 'static,
 {
     let (tx, mut rx) = mpsc::channel::<A::Msg>(32);
     let queue = Arc::new(Mutex::new(BinaryHeap::<PrioritizedWrapper<A::Msg>>::new()));
@@ -46,14 +49,30 @@ where
     // Process messages
     tokio::spawn(async move {
         loop {
-            notify.notified().await;
-            let msg = {
+            let msg_opt = {
                 let mut q = queue.lock().await;
-                q.pop()
+                if q.is_empty() {
+                    drop(q);
+                    notify.notified().await;
+                    queue.lock().await.pop()
+                } else {
+                    q.pop()
+                }
             };
 
-            if let Some(PrioritizedWrapper(msg)) = msg {
-                actor.handle(msg).await;
+            if let Some(PrioritizedWrapper(msg)) = msg_opt {
+                if !actor.handle(msg).await {
+                    println!(
+                        "[{}] Actor received shutdown signal. Processor task terminating.",
+                        std::any::type_name::<A>()
+                    );
+                    break; // Exit the loop on shutdown signal
+                }
+            } else {
+                let q_check = queue.lock().await;
+                if q_check.is_empty() {
+                    break; // Exit the loop
+                }
             }
         }
     });
@@ -93,7 +112,7 @@ macro_rules! define_actor {
         impl $msg_name:ident {
             $(
                 @priority($prio:ident)
-                fn $method:ident ( &mut self $(, $arg_name:ident : $arg_ty:ty )* ) $body:block
+                fn $method:ident ( &mut self $(, $arg_name:ident : $arg_ty:ty )* ) $(-> $ret_ty:ty)? $body:block
             )*
         }
     ) => {
@@ -104,7 +123,8 @@ macro_rules! define_actor {
         pub enum $msg_name {
             $(
                 $method($($arg_ty),*)
-            ),*
+            ),*,
+            Shutdown, // Explicit Shutdown message
         }
 
         impl $crate::Prioritized for $msg_name {
@@ -113,6 +133,7 @@ macro_rules! define_actor {
                     $(
                         $msg_name::$method(..) => $crate::Priority::$prio,
                     )*
+                    $msg_name::Shutdown => $crate::Priority::Shutdown, // Assign highest priority
                 }
             }
         }
@@ -121,20 +142,24 @@ macro_rules! define_actor {
         impl $crate::Actor for $actor_name {
             type Msg = $msg_name;
 
-            async fn handle(&mut self, msg: Self::Msg) {
+            async fn handle(&mut self, msg: Self::Msg) -> bool {
                 match msg {
                     $(
                         $msg_name::$method($($arg_name),*) => {
                             self.$method($($arg_name),*).await;
+                            true // Continue processing after method call
                         }
                     ),*
+                    $msg_name::Shutdown => {
+                        false // Signal to stop processing
+                    }
                 }
             }
         }
 
         impl $actor_name {
             $(
-                pub async fn $method(&mut self $(, $arg_name : $arg_ty )* ) $body
+                pub async fn $method(&mut self $(, $arg_name : $arg_ty )* ) $(-> $ret_ty)? $body
             )*
         }
     };
