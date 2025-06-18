@@ -4,7 +4,7 @@ use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 pub enum Priority {
     Low,
     Medium,
