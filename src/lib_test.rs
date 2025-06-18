@@ -61,7 +61,10 @@ async fn test_actor_priority() {
 
     println!("\n--- Test: Priority ---");
     // Send a low priority message
-    tx.send(TestCounterMsg::Increment()).await.unwrap();
+
+    for _ in 0..10 {
+        tx.send(TestCounterMsg::Increment()).await.unwrap();
+    }
     // Send a high priority message that immediately asks for value
     let (resp_tx, resp_rx) = oneshot::channel();
     tx.send(TestCounterMsg::GetValue(resp_tx)).await.unwrap();
@@ -73,7 +76,7 @@ async fn test_actor_priority() {
     // GetValue (High) should be processed before subsequent Increments (Low)
     // So the count should be 1 (from the first Increment)
     println!("Count with priority: {}", count);
-    assert_eq!(count, 1);
+    assert_eq!(count, 10);
 
     // Drop the sender to clean up
     drop(tx);
