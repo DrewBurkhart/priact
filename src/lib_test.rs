@@ -42,7 +42,7 @@ async fn test_actor_explicit_shutdown() {
     println!("Sending Shutdown message...");
     tx.send(TestCounterMsg::Shutdown).await.unwrap();
 
-    // Try to send more messages (these might not be processed if Shutdown is immediate)
+    // Try to send more messages.
     let (ack_tx, _) = oneshot::channel();
     let send_res = tx.send(TestCounterMsg::Increment(ack_tx)).await;
     if send_res.is_err() {
@@ -74,13 +74,11 @@ async fn test_actor_priority() {
         // Send the message with the ack sender
         tx.send(TestCounterMsg::Increment(ack_tx)).await.unwrap();
 
-        // **CRUCIAL**: Wait for the actor to signal that it has processed the message
+        // Wait for the actor to signal that it has processed the message
         ack_rx.await.unwrap();
         println!("  - Increment #{} acknowledged.", i + 1);
     }
     println!("All 10 Increment messages have been processed by the actor.");
-
-    // At this point, we are GUARANTEED that the actor's count is 10.
 
     // --- Phase 2: Send a high-priority message and check the state ---
     println!("Sending high-priority GetValue message...");
@@ -104,7 +102,7 @@ async fn test_actor_priority() {
         "GetValue should see the count after the first 10 increments"
     );
 
-    // --- Optional: Clean up and verify final state ---
+    // Clean up and verify final state ---
     // Wait for the final two increments to finish
     ack_rx_11.await.unwrap();
     ack_rx_12.await.unwrap();
@@ -148,12 +146,9 @@ async fn test_actor_implicit_shutdown_completes() {
     drop(tx);
     println!("Sender dropped. Waiting for actor tasks to terminate...");
 
-    let shutdown_timeout = tokio::time::timeout(
-        tokio::time::Duration::from_millis(1000), // Max wait 1 second
-        async {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        },
-    )
+    let shutdown_timeout = tokio::time::timeout(tokio::time::Duration::from_millis(1000), async {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    })
     .await;
 
     assert!(

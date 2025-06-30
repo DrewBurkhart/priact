@@ -22,7 +22,7 @@ pub enum Priority {
     Low,
     Medium,
     High,
-    // Add highest priority for shutdown messages
+    // Highest priority for shutdown messages
     Shutdown,
 }
 
@@ -49,8 +49,7 @@ pub fn spawn_actor<A>(mut actor: A) -> mpsc::Sender<A::Msg>
 where
     A: Actor + Send + 'static,
 {
-    // The channel capacity. Choose based on expected message volume.
-    // A smaller buffer might apply backpressure sooner.
+    // The channel capacity.
     let (tx, mut rx) = mpsc::channel::<A::Msg>(32);
 
     // Queue for messages, protected by a Mutex, ordered by Priority
@@ -77,35 +76,35 @@ where
 
     // Processor task
     let actor_name_proc = std::any::type_name::<A>().to_string();
-    let tx_clone = tx.clone(); // Clone sender to check if it's closed
+    let tx_clone = tx.clone();
     tokio::spawn(async move {
         println!("[{}] Message processor task started.", actor_name_proc);
         loop {
             let msg = loop {
                 let mut q = queue.lock().await;
                 if let Some(msg) = q.pop() {
-                    break msg; // Got a message, break inner loop
+                    break msg;
                 }
-                // Queue is empty, check if we should shut down.
+                // Queue is empty.
                 if tx_clone.is_closed() {
                     println!(
                         "[{}] All senders dropped and queue is empty. Processor task terminating.",
                         actor_name_proc
                     );
-                    return; // Exit the whole task
+                    return;
                 }
                 // Release lock and wait for notification
                 drop(q);
                 notify.notified().await;
             };
 
-            // We have a message, handle it
+            // We have a message.
             if !actor.handle(msg.0).await {
                 println!(
                     "[{}] Actor received shutdown signal. Processor task terminating.",
                     actor_name_proc
                 );
-                break; // Exit outer loop
+                break;
             }
         }
     });
